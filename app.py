@@ -17,7 +17,7 @@ import schedule
 from playwright.sync_api import sync_playwright
 
 DEFAULT_URL = "https://servicesessentials.ibm.com/curatorai/apps/ui/new-chat/"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 GITHUB_REPOSITORY = "Samyajit-adusa/ica__status_checker"
 GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 RELEASE_ASSET_NAME = "ica_automation.exe"
