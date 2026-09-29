@@ -21,7 +21,7 @@ if getattr(sys, "frozen", False):
 from playwright.sync_api import sync_playwright
 
 DEFAULT_URL = "https://servicesessentials.ibm.com/curatorai/apps/ui/new-chat/"
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 GITHUB_REPOSITORY = "Samyajit-adusa/ica__status_checker"
 GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 RELEASE_ASSET_NAME = "ica_automation-windows.zip"
@@ -66,6 +66,7 @@ class BrowserAutomationApp(ctk.CTk):
         self.first_run = self._is_new_profile_path(self.default_profile_dir)
         self._ensure_profile_dir(self.default_profile_dir)
         self._ensure_packaged_inputs_file()
+        self._ensure_desktop_shortcut()
 
         self.url_var = ctk.StringVar(value=DEFAULT_URL)
         self.profile_var = ctk.StringVar(value=str(self.default_profile_dir))
@@ -234,6 +235,35 @@ class BrowserAutomationApp(ctk.CTk):
             if not runtime_inputs.exists() or runtime_inputs.stat().st_size == 0:
                 shutil.copy2(source_inputs, runtime_inputs)
         return runtime_inputs
+
+    def _ensure_desktop_shortcut(self):
+        if not getattr(sys, "frozen", False) or os.name != "nt":
+            return
+
+        shortcut_script = (
+            "$shell = New-Object -ComObject WScript.Shell; "
+            "$desktop = $shell.SpecialFolders('Desktop'); "
+            "$shortcutPath = Join-Path $desktop 'ICA Automation.lnk'; "
+            "$shortcut = $shell.CreateShortcut($shortcutPath); "
+            "$shortcut.TargetPath = $env:ICA_AUTOMATION_TARGET; "
+            "$shortcut.WorkingDirectory = Split-Path -Parent $env:ICA_AUTOMATION_TARGET; "
+            "$shortcut.IconLocation = $env:ICA_AUTOMATION_TARGET; "
+            "$shortcut.Description = 'IBM CuratorAI Browser Runner'; "
+            "$shortcut.Save()"
+        )
+        environment = os.environ.copy()
+        environment["ICA_AUTOMATION_TARGET"] = str(Path(sys.executable).resolve())
+        try:
+            subprocess.run(
+                ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", shortcut_script],
+                env=environment,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
     def _show_first_run_setup_dialog(self):
         dialog = ctk.CTkToplevel(self)
