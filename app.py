@@ -14,13 +14,17 @@ from pathlib import Path
 
 import customtkinter as ctk
 import schedule
+
+if getattr(sys, "frozen", False):
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path(sys._MEIPASS) / "browsers"))
+
 from playwright.sync_api import sync_playwright
 
 DEFAULT_URL = "https://servicesessentials.ibm.com/curatorai/apps/ui/new-chat/"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 GITHUB_REPOSITORY = "Samyajit-adusa/ica__status_checker"
 GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
-RELEASE_ASSET_NAME = "ica_automation.exe"
+RELEASE_ASSET_NAME = "ica_automation-windows.zip"
 RELEASE_CHECKSUM_ASSET_NAME = f"{RELEASE_ASSET_NAME}.sha256"
 
 def _default_profile_user_name():
@@ -343,6 +347,10 @@ class BrowserAutomationApp(ctk.CTk):
         return tuple(int(part) for part in version.lstrip("v").split("."))
 
     @staticmethod
+    def _is_folder_install():
+        return getattr(sys, "frozen", False) and (Path(sys.executable).resolve().parent / "_internal").is_dir()
+
+    @staticmethod
     def _fetch_url(url):
         request = Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "ICA-Automation-Updater"})
         with urlopen(request, timeout=30) as response:
@@ -359,20 +367,28 @@ class BrowserAutomationApp(ctk.CTk):
             try:
                 release = json.loads(self._fetch_url(GITHUB_RELEASE_API_URL))
                 latest_version = release["tag_name"].lstrip("v")
-                if self._version_tuple(latest_version) <= self._version_tuple(APP_VERSION):
+                needs_folder_migration = not self._is_folder_install()
+                if self._version_tuple(latest_version) < self._version_tuple(APP_VERSION):
+                    self.after(0, self._show_no_update_available)
+                    return
+
+                if self._version_tuple(latest_version) == self._version_tuple(APP_VERSION) and not needs_folder_migration:
                     self.after(0, self._show_no_update_available)
                     return
 
                 assets = {asset["name"]: asset["browser_download_url"] for asset in release.get("assets", [])}
                 if RELEASE_ASSET_NAME not in assets or RELEASE_CHECKSUM_ASSET_NAME not in assets:
-                    raise RuntimeError("The latest release is missing its executable or SHA-256 checksum.")
+                    raise RuntimeError("The latest release is missing its application ZIP or SHA-256 checksum.")
 
                 self._update_info = {
                     "version": latest_version,
                     "download_url": assets[RELEASE_ASSET_NAME],
                     "checksum_url": assets[RELEASE_CHECKSUM_ASSET_NAME],
                 }
-                self.after(0, self._show_update_available)
+                if needs_folder_migration:
+                    self.after(0, self._migrate_to_folder_install)
+                else:
+                    self.after(0, self._show_update_available)
             except (KeyError, TypeError, ValueError, URLError, TimeoutError, OSError) as exc:
                 self.after(0, lambda error=exc: self._show_update_check_failed(error))
             finally:
@@ -391,6 +407,12 @@ class BrowserAutomationApp(ctk.CTk):
         self.status_var.set(f"Update v{version} available")
         self._append_log(f"Update v{version} is available. Click Install v{version} to download and restart.")
 
+    def _migrate_to_folder_install(self):
+        self.update_btn.configure(state="disabled", text="Optimizing startup...")
+        self.status_var.set("Preparing faster startup...")
+        self._append_log("Migrating this legacy install to the faster folder-based package.")
+        self._install_available_update()
+
     def _show_update_check_failed(self, exc):
         self.update_btn.configure(state="normal", text="Check updates")
         self._append_log(f"Update check could not be completed: {exc}")
@@ -400,7 +422,7 @@ class BrowserAutomationApp(ctk.CTk):
             return
         if not getattr(sys, "frozen", False):
             self.status_var.set("Build the app before installing updates")
-            self._append_log("Updates can only replace the packaged executable, not app.py.")
+            self._append_log("Updates can only replace the installed application, not app.py.")
             return
 
         self.update_btn.configure(state="disabled", text="Downloading...")
@@ -413,32 +435,45 @@ class BrowserAutomationApp(ctk.CTk):
                 if len(expected_checksum) != 64 or any(char not in "0123456789abcdef" for char in expected_checksum):
                     raise RuntimeError("The release checksum is invalid.")
 
-                download_path = Path(tempfile.gettempdir()) / f"{RELEASE_ASSET_NAME}.{self._update_info['version']}.download"
+                download_path = Path(tempfile.gettempdir()) / f"ica_automation-{self._update_info['version']}.zip"
                 download_path.write_bytes(self._fetch_url(self._update_info["download_url"]))
                 actual_checksum = hashlib.sha256(download_path.read_bytes()).hexdigest()
                 if actual_checksum != expected_checksum:
                     download_path.unlink(missing_ok=True)
                     raise RuntimeError("Downloaded update failed SHA-256 verification.")
 
-                self.after(0, lambda: self._replace_executable_and_restart(download_path))
+                self.after(0, lambda: self._replace_installation_and_restart(download_path))
             except (URLError, TimeoutError, OSError, RuntimeError) as exc:
                 self.after(0, lambda error=exc: self._show_update_install_failed(error))
 
         threading.Thread(target=_download_and_install, daemon=True).start()
 
-    def _replace_executable_and_restart(self, download_path):
-        target_path = Path(sys.executable).resolve()
-        script_path = Path(tempfile.gettempdir()) / "ica_automation_update.cmd"
+    def _replace_installation_and_restart(self, download_path):
+        install_dir = Path(sys.executable).resolve().parent
+        target_path = install_dir / "ica_automation.exe"
+        script_path = Path(tempfile.gettempdir()) / "ica_automation_update.ps1"
+        staging_dir = Path(tempfile.gettempdir()) / f"ica_automation-{self._update_info['version']}-staging"
         script_path.write_text(
-            "@echo off\n"
-            "timeout /t 2 /nobreak > nul\n"
-            f'move /y "{download_path}" "{target_path}" > nul\n'
-            f'start "" "{target_path}"\n'
-            'del "%~f0"\n',
-            encoding="ascii",
+            "$ErrorActionPreference = 'Stop'\n"
+            f"$process = Get-Process -Id {os.getpid()} -ErrorAction SilentlyContinue\n"
+            "if ($process) { $process.WaitForExit() }\n"
+            f"$staging = '{staging_dir}'\n"
+            f"$installDir = '{install_dir}'\n"
+            f"$archive = '{download_path}'\n"
+            "Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue\n"
+            "Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force\n"
+            "if (-not (Test-Path (Join-Path $staging 'ica_automation.exe'))) { throw 'Update archive is missing ica_automation.exe.' }\n"
+            "robocopy $staging $installDir /E /IS /IT /NFL /NDL /NJH /NJS /NP\n"
+            "if ($LASTEXITCODE -gt 7) { throw \"File replacement failed with robocopy exit code $LASTEXITCODE.\" }\n"
+            f"Start-Process -FilePath '{target_path}'\n"
+            "Remove-Item -LiteralPath $archive, $staging -Recurse -Force -ErrorAction SilentlyContinue\n",
+            encoding="utf-8",
         )
-        self._append_log("Update verified. Installing and restarting the application.")
-        subprocess.Popen(["cmd.exe", "/c", str(script_path)], creationflags=subprocess.CREATE_NO_WINDOW)
+        self._append_log("Update verified. Installing the new app folder and restarting.")
+        subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script_path)],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
         self.destroy()
 
     def _show_update_install_failed(self, exc):

@@ -21,15 +21,20 @@ jobs:
       - name: Install Playwright browser
         shell: pwsh
         run: $env:PLAYWRIGHT_BROWSERS_PATH = "0"; python -m playwright install chromium
-      - name: Build executable
+      - name: Build application package and bridge executable
         run: pyinstaller --noconfirm app.spec
-      - name: Create SHA-256 checksum
+      - name: Create ZIP package and SHA-256 checksums
         shell: pwsh
-        run: (Get-FileHash dist/ica_automation.exe -Algorithm SHA256).Hash.ToLower() + "  ica_automation.exe" | Set-Content -NoNewline dist/ica_automation.exe.sha256
+        run: |
+          Compress-Archive -Path dist/ica_automation/* -DestinationPath dist/ica_automation-windows.zip
+          (Get-FileHash dist/ica_automation-windows.zip -Algorithm SHA256).Hash.ToLower() + "  ica_automation-windows.zip" | Set-Content -NoNewline dist/ica_automation-windows.zip.sha256
+          (Get-FileHash dist/ica_automation.exe -Algorithm SHA256).Hash.ToLower() + "  ica_automation.exe" | Set-Content -NoNewline dist/ica_automation.exe.sha256
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
+            dist/ica_automation-windows.zip
+            dist/ica_automation-windows.zip.sha256
             dist/ica_automation.exe
             dist/ica_automation.exe.sha256
