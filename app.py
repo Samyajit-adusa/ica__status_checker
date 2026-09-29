@@ -21,7 +21,7 @@ if getattr(sys, "frozen", False):
 from playwright.sync_api import sync_playwright
 
 DEFAULT_URL = "https://servicesessentials.ibm.com/curatorai/apps/ui/new-chat/"
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 GITHUB_REPOSITORY = "Samyajit-adusa/ica__status_checker"
 GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 RELEASE_ASSET_NAME = "ica_automation-windows.zip"
@@ -48,6 +48,9 @@ MAX_LOGIN_WAIT_SECONDS = 180
 RESPONSE_TIMEOUT_SECONDS = 120
 NETWORK_RETRY_ATTEMPTS = 3
 NETWORK_RETRY_DELAY_SECONDS = 3
+UPDATE_DOWNLOAD_TIMEOUT_SECONDS = 60
+UPDATE_DOWNLOAD_RETRY_ATTEMPTS = 3
+UPDATE_DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 CHAT_TEXTAREA_SELECTOR = 'textarea#chat-input__text-area[data-testid="chat-input__textarea"]'
 CHAT_TEXTAREA_FALLBACK_SELECTOR = 'textarea[placeholder="Ask a Question"]'
 CHAT_SUBMIT_BUTTON_SELECTOR = 'button[type="submit"], button[data-testid*="send"], button[aria-label*="Send"], button[title*="Send"], button:has-text("Send")'
@@ -447,6 +450,57 @@ class BrowserAutomationApp(ctk.CTk):
         self.update_btn.configure(state="normal", text="Check updates")
         self._append_log(f"Update check could not be completed: {exc}")
 
+    def _set_update_download_progress(self, downloaded_bytes, total_bytes):
+        downloaded_mb = downloaded_bytes / (1024 * 1024)
+        if total_bytes:
+            percent = min(100, int(downloaded_bytes * 100 / total_bytes))
+            total_mb = total_bytes / (1024 * 1024)
+            button_text = f"Downloading {percent}%"
+            status_text = f"Downloading update: {downloaded_mb:.0f} of {total_mb:.0f} MB"
+        else:
+            button_text = f"Downloading {downloaded_mb:.0f} MB"
+            status_text = "Downloading update..."
+
+        self.after(
+            0,
+            lambda: (
+                self.update_btn.configure(text=button_text),
+                self.status_var.set(status_text),
+            ),
+        )
+
+    def _download_update_asset(self, url, download_path):
+        for attempt in range(1, UPDATE_DOWNLOAD_RETRY_ATTEMPTS + 1):
+            try:
+                request = Request(url, headers={"User-Agent": "ICA-Automation-Updater"})
+                with urlopen(request, timeout=UPDATE_DOWNLOAD_TIMEOUT_SECONDS) as response:
+                    total_bytes = int(response.headers.get("Content-Length", "0"))
+                    downloaded_bytes = 0
+                    last_reported_percent = -1
+                    with download_path.open("wb") as download_file:
+                        while chunk := response.read(UPDATE_DOWNLOAD_CHUNK_BYTES):
+                            download_file.write(chunk)
+                            downloaded_bytes += len(chunk)
+                            percent = int(downloaded_bytes * 100 / total_bytes) if total_bytes else downloaded_bytes // UPDATE_DOWNLOAD_CHUNK_BYTES
+                            if percent != last_reported_percent:
+                                self._set_update_download_progress(downloaded_bytes, total_bytes)
+                                last_reported_percent = percent
+                return
+            except (URLError, TimeoutError, OSError) as exc:
+                download_path.unlink(missing_ok=True)
+                if attempt == UPDATE_DOWNLOAD_RETRY_ATTEMPTS:
+                    raise RuntimeError(f"Update download failed after {attempt} attempts: {exc}") from exc
+
+                delay = NETWORK_RETRY_DELAY_SECONDS * attempt
+                self._append_log(
+                    f"Update download interrupted (attempt {attempt}/{UPDATE_DOWNLOAD_RETRY_ATTEMPTS}). "
+                    f"Retrying in {delay} seconds: {exc}"
+                )
+                self.after(0, lambda retry=attempt: self.status_var.set(
+                    f"Update download interrupted - retrying ({retry}/{UPDATE_DOWNLOAD_RETRY_ATTEMPTS})"
+                ))
+                time.sleep(delay)
+
     def _install_available_update(self):
         if self._update_info is None:
             return
@@ -466,7 +520,7 @@ class BrowserAutomationApp(ctk.CTk):
                     raise RuntimeError("The release checksum is invalid.")
 
                 download_path = Path(tempfile.gettempdir()) / f"ica_automation-{self._update_info['version']}.zip"
-                download_path.write_bytes(self._fetch_url(self._update_info["download_url"]))
+                self._download_update_asset(self._update_info["download_url"], download_path)
                 actual_checksum = hashlib.sha256(download_path.read_bytes()).hexdigest()
                 if actual_checksum != expected_checksum:
                     download_path.unlink(missing_ok=True)
@@ -507,7 +561,8 @@ class BrowserAutomationApp(ctk.CTk):
         self.destroy()
 
     def _show_update_install_failed(self, exc):
-        self.update_btn.configure(state="normal", text="Install failed")
+        version = self._update_info["version"] if self._update_info else "update"
+        self.update_btn.configure(state="normal", text=f"Retry v{version}", command=self._install_available_update)
         self.status_var.set("Update download failed")
         self._append_log(f"Update could not be installed: {exc}")
 
