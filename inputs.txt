@@ -1,0 +1,130 @@
+How do I create a Delta table from a CSV file in Databricks?
+How can I optimize a Spark job for better performance in Databricks?
+What is the difference between a managed table and an external table in Databricks?
+How do I read JSON files from ADLS Gen2 into a Spark DataFrame in Databricks?
+How can I partition a Delta table by date in Databricks?
+What is the best way to handle schema evolution in Delta Lake?
+How do I implement incremental loads using watermarking in Databricks?
+How can I use Auto Loader to ingest files from cloud storage into Databricks?
+What is the difference between append, overwrite, and merge modes in Spark writes?
+How do I create a temporary view and query it in Databricks SQL?
+How can I use dbt with Databricks for ELT workflows?
+How do I troubleshoot a slow Databricks notebook execution?
+What are the best practices for writing efficient PySpark transformations?
+How do I use the MERGE command in Delta Lake for SCD Type 2 updates?
+How can I handle null values before writing to a Delta table?
+How do I monitor job failures in Databricks Workflows?
+What is the role of cluster autoscaling in Databricks ETL performance?
+How do I read a large Parquet file efficiently in PySpark?
+How can I set up a medallion architecture in Databricks?
+What is the difference between bronze, silver, and gold layers in Databricks?
+How do I build a CDC pipeline using Databricks and Delta Lake?
+How can I deduplicate records while loading data into a Delta table?
+How do I handle late-arriving data in an ETL pipeline?
+What is the best way to expose Databricks tables to BI tools?
+How can I schedule a Databricks notebook job with parameters?
+How do I use Unity Catalog for data governance in Databricks?
+How can I read data from Kafka into Databricks for streaming ETL?
+What is the difference between batch and streaming ETL in Databricks?
+How do I create a slowly changing dimension in Databricks?
+How can I optimize joins in Spark for large datasets?
+How do I create and use a UDF in Databricks notebooks?
+How can I use SQL warehouses for analytics on ETL output?
+What are common causes of OOM errors in Databricks workloads?
+How do I implement data quality checks in a Databricks pipeline?
+How can I use Databricks Notebooks for orchestration and testing?
+How do I write a DataFrame to a Delta table with schema enforcement?
+How do I use checkpointing in Structured Streaming?
+What is the impact of file size on Spark read performance?
+How can I use the COPY INTO command in Databricks SQL?
+How do I load data from S3 into Databricks using Spark?
+How can I flatten nested JSON in a PySpark DataFrame?
+How do I perform row-level validation before inserting into a target table?
+How can I create a reusable ETL pipeline template in Databricks?
+How do I use the Databricks CLI to deploy notebook jobs?
+How can I integrate Databricks with Azure Data Factory?
+What is the best practice for handling secrets in Databricks notebooks?
+How do I use environment variables in Databricks jobs?
+How do I set up job dependencies in Databricks Workflows?
+How can I optimize table statistics for Delta performance?
+How do I read from multiple CSV files into one DataFrame?
+What is the best way to test a Delta table migration?
+How do I create a reusable parameterized ETL notebook?
+How can I implement retries for failed Spark jobs in Databricks?
+How do I handle timezone conversions in ETL pipelines?
+How do I create a custom schema for a landing zone in Databricks?
+How can I infer a schema for JSON data in PySpark?
+How do I use Spark SQL to clean and transform raw data?
+How can I archive older data partitions in Databricks?
+What are the recommended retention policies for Delta tables?
+How do I write a change-data-capture pipeline for SQL Server into Databricks?
+How can I use dynamic file paths in a Databricks ETL notebook?
+How do I validate data types before loading into a warehouse?
+What is the difference between DataFrame cache and persist in Spark?
+How can I troubleshoot a Delta table not updating as expected?
+How do I implement a fan-out ETL pattern in Databricks?
+How can I merge multiple small files into larger Parquet files?
+How do I configure a Databricks cluster for ETL workloads?
+What are the best practices for writing idempotent ETL jobs?
+How can I use Spark broadcast joins for dimension tables?
+How do I implement a star schema in Databricks SQL?
+How do I debug schema mismatch errors in a Spark job?
+How can I use Databricks SQL to validate transformation output?
+What is the difference between a view and a materialized table in Databricks?
+How do I populate a bronze layer from streaming sources?
+How can I use job clusters instead of all-purpose clusters for ETL?
+How do I test a pipeline in a development environment before production?
+How can I use Databricks Repos for version-controlled ETL code?
+What is the best way to manage dependencies in a Databricks notebook?
+How do I schedule a daily ETL refresh in Databricks?
+How can I create a robust landing zone for raw CSV and JSON files?
+How do I use Delta log retention and VACUUM safely?
+What are the tradeoffs of using Delta vs Parquet for ETL pipelines?
+How do I implement a retryable data extraction job from an API into Databricks?
+How can I build a streaming pipeline from Event Hubs to Delta Lake?
+How do I write unit tests for PySpark ETL logic?
+What are best practices for column naming and data type conventions?
+How can I use commands like describe history and optimize on Delta tables?
+How do I handle duplicate keys during incremental merge operations?
+How can I use partition pruning to improve ETL performance?
+What is the best way to create a fact table in Databricks?
+How do I monitor Databricks table growth and storage costs?
+How can I process semi-structured data with Spark in Databricks?
+How do I use temp views for iterative data exploration before final ETL?
+What is the best practice for snapshotting data in a Delta pipeline?
+How can I pipeline data from SAP or ERP systems into Databricks?
+How do I ensure referential integrity in a warehouse built on Databricks?
+How can I implement cross-region replication for ETL data?
+How do I use pipeline alerts and notifications in Databricks?
+How do I design an ETL job with clear failure boundaries and checkpoints?
+How can I optimize DataFrame transformations with narrow projections?
+What is the best way to backfill historical data in Delta tables?
+How do I move data from bronze to silver with quality filters applied?
+How can I use the Databricks cluster UI to diagnose ETL bottlenecks?
+How do I build a scalable data ingestion layer for IoT events in Databricks?
+How can I use lineage and table history for auditing ETL changes?
+What is the recommended approach for handling deletes in Delta pipelines?
+How do I create a robust error-handling framework for ETL notebooks?
+How do I use Spark SQL to transform data from wide to long format?
+How can I create and maintain a data dictionary for ETL outputs?
+How do I manage ETL drift when source schemas change over time?
+How can I create a high-performance data lakehouse pattern in Databricks?
+How do I use checkpoints and watermarking for streaming ETL recovery?
+How can I automate ad hoc ETL tasks in Databricks Jobs?
+What is the best method for testing a Databricks pipeline end to end?
+How do I compare raw vs curated data in a Databricks pipeline?
+How can I improve ETL speed using predicate pushdown and partition pruning?
+How do I create a robust daily ingestion pipeline for CSV and JSON sources?
+How can I use Databricks Unity Catalog for row-level security in ETL outputs?
+How do I implement a retry policy for API-based extraction jobs?
+How can I stage large datasets efficiently before final transformation?
+How do I use Spark caching without affecting memory constraints?
+How can I design a data quality framework for Databricks pipelines?
+How do I handle schema drift in JSON ingestion pipelines?
+What is the best way to manage ETL orchestration between notebooks and jobs?
+How can I use Spark window functions for ETL transformations?
+How do I ensure my Databricks ETL pipeline is idempotent and recoverable?
+How do I build a data contract between ingestion and consumption layers?
+How can I use custom logging and metrics in Databricks ETL jobs?
+How do I use Delta table history to audit ETL changes and rollbacks?
+How can I optimize a Databricks workspace for multiple ETL teams?
