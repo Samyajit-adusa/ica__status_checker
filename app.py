@@ -17,7 +17,7 @@ import schedule
 from playwright.sync_api import sync_playwright
 
 DEFAULT_URL = "https://servicesessentials.ibm.com/curatorai/apps/ui/new-chat/"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 GITHUB_REPOSITORY = "Samyajit-adusa/ica__status_checker"
 GITHUB_RELEASE_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 RELEASE_ASSET_NAME = "ica_automation.exe"
@@ -41,6 +41,7 @@ DEFAULT_PROFILE_DIR = _default_profile_dir()
 PAGE_TIMEOUT_SECONDS = 90
 SELECTOR_TIMEOUT_SECONDS = 30
 MAX_LOGIN_WAIT_SECONDS = 180
+RESPONSE_TIMEOUT_SECONDS = 120
 NETWORK_RETRY_ATTEMPTS = 3
 NETWORK_RETRY_DELAY_SECONDS = 3
 CHAT_TEXTAREA_SELECTOR = 'textarea#chat-input__text-area[data-testid="chat-input__textarea"]'
@@ -66,6 +67,7 @@ class BrowserAutomationApp(ctk.CTk):
         self.profile_var = ctk.StringVar(value=str(self.default_profile_dir))
         self.headless_var = ctk.BooleanVar(value=False)
         self.scheduler_var = ctk.BooleanVar(value=False)
+        self.wait_for_response_var = ctk.BooleanVar(value=False)
         self.interval_var = ctk.StringVar(value="15")
         self.status_var = ctk.StringVar(value="Ready")
 
@@ -134,6 +136,14 @@ class BrowserAutomationApp(ctk.CTk):
             offvalue=False,
             command=self._toggle_scheduler,
         ).grid(row=0, column=1, padx=18, pady=12, sticky="e")
+
+        ctk.CTkSwitch(
+            options,
+            text="Wait for response",
+            variable=self.wait_for_response_var,
+            onvalue=True,
+            offvalue=False,
+        ).grid(row=1, column=0, padx=18, pady=(0, 12), sticky="w")
 
         interval_frame = ctk.CTkFrame(form, corner_radius=10)
         interval_frame.grid(row=3, column=0, columnspan=2, padx=18, pady=(6, 18), sticky="ew")
@@ -691,6 +701,54 @@ class BrowserAutomationApp(ctk.CTk):
 
         return None
 
+    def _assistant_response_count(self, page):
+        selectors = [
+            "[data-message-author-role='assistant']",
+            "[data-testid*='assistant' i]",
+            "[data-testid*='message' i][data-role='assistant']",
+            "article[data-role='assistant']",
+        ]
+
+        for selector in selectors:
+            try:
+                locator = page.locator(selector)
+                count = locator.count()
+                if count:
+                    return locator, count
+            except Exception:
+                continue
+
+        return None, 0
+
+    def _wait_for_chat_response(self, page, response_count_before_send):
+        deadline = time.time() + RESPONSE_TIMEOUT_SECONDS
+        last_text = ""
+        stable_checks = 0
+
+        while time.time() < deadline:
+            locator, response_count = self._assistant_response_count(page)
+            if locator is not None and response_count > response_count_before_send:
+                try:
+                    response_text = locator.last.inner_text(timeout=2000).strip()
+                except Exception:
+                    response_text = ""
+
+                if response_text:
+                    if response_text == last_text:
+                        stable_checks += 1
+                    else:
+                        last_text = response_text
+                        stable_checks = 0
+
+                    if stable_checks >= 2:
+                        self._append_log("ICA response received.")
+                        return True
+
+            page.wait_for_timeout(1000)
+
+        self._append_log(f"No completed ICA response detected within {RESPONSE_TIMEOUT_SECONDS} seconds.")
+        return False
+
     def _human_type(self, locator, text):
         locator.click()
         # Typed text is intentionally a little imperfect to mimic a human rhythm.
@@ -728,6 +786,8 @@ class BrowserAutomationApp(ctk.CTk):
             self._append_log("Could not find chat input. Please verify the page layout.")
             raise RuntimeError("Chat input not found")
 
+        _, response_count_before_send = self._assistant_response_count(page)
+
         try:
             chat_box.wait_for(state="visible", timeout=SELECTOR_TIMEOUT_SECONDS * 1000)
             chat_box.click()
@@ -741,6 +801,10 @@ class BrowserAutomationApp(ctk.CTk):
                 page.keyboard.press("Enter")
 
             self._append_log("Prompt submitted successfully.")
+            if self.wait_for_response_var.get():
+                self.status_var.set("Waiting for ICA response...")
+                self._append_log(f"Waiting up to {RESPONSE_TIMEOUT_SECONDS} seconds for the ICA response.")
+                self._wait_for_chat_response(page, response_count_before_send)
             return prompt
         except Exception:
             self._append_log("Chat input was found but typing or sending failed. Retrying with a fallback approach.")
